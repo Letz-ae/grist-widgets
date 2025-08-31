@@ -61,16 +61,64 @@
     top: 46mm;
     left: 44mm;
   }
+    .photo {
+        top: 25mm;
+        left: 5mm;
+        width: 20mm;
+        height: 25mm;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        border: 1mm solid #ccc;
+        border-radius: 1mm;
+    }
+
+    .id-photo {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
 </style>
 
-<div class="container">
-  <div class="content id">2508-01001</div>
-  <div class="content name">Yacine YAHYAOUI</div>
-  <div class="content position">CEO</div>
-  <div class="content company">Soloist</div>
-  <div class="content issue">1000</div>
-  <div class="content expiration">31/12/2025</div>
-  <img
-    src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/a919ac76-f7a5-4a9c-8c07-93b39c252509_2048x2048.webp"
-  />
-</div>
+    <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+
+    <div class="container">
+    <div class="content id">2508-01001</div>
+    <div class="content name"></div>
+    <div class="content position"></div>
+    <div class="content company">LETZ</div>
+    <div class="content issue">1000</div>
+    <div class="content expiration">31/12/2025</div>
+    
+    <div class="content photo">
+        <img src="" alt="ID Photo">
+    </div>
+    <img
+        class="background" src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/a919ac76-f7a5-4a9c-8c07-93b39c252509_2048x2048.webp"
+    />
+    </div>
+
+<script async>
+    grist.ready()
+    grist.onRecord(async function (record) {
+        document.querySelector(".id").textContent = record.Employee_ID
+        document.querySelector(".name").textContent = record.Full_Name
+        document.querySelector(".position").textContent = record.Position
+        document.querySelector(".issue").textContent = record.Contract_Date.toLocaleDateString()
+        document.querySelector(".expiration").textContent = record.Contract_End.toLocaleDateString()
+        const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true })
+        const attachmentId = record.Photo
+        const photoURL = `${tokenInfo.baseUrl}/attachments/${attachmentId}/download?auth=${tokenInfo.token}`
+        
+        document.querySelector(".photo img").src = photoURL
+
+        function formatDate(date) {
+    
+            return [
+                String(date.getDate()).padStart(2, '0'),
+                String(date.getMonth() + 1).padStart(2, '0'),
+                date.getFullYear()
+            ].join('/')
+        }
+    })
+</script>
