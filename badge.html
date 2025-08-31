@@ -83,12 +83,12 @@
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
 
     <div class="container">
-    <div class="content id">2508-01001</div>
+    <div class="content id"></div>
     <div class="content name"></div>
     <div class="content position"></div>
     <div class="content company">LETZ</div>
-    <div class="content issue">1000</div>
-    <div class="content expiration">31/12/2025</div>
+    <div class="content issue"></div>
+    <div class="content expiration"></div>
     
     <div class="content photo">
         <img src="" alt="ID Photo">
@@ -104,8 +104,8 @@
         document.querySelector(".id").textContent = record.Employee_ID
         document.querySelector(".name").textContent = record.Full_Name
         document.querySelector(".position").textContent = record.Position
-        document.querySelector(".issue").textContent = record.Contract_Date.toLocaleDateString()
-        document.querySelector(".expiration").textContent = record.Contract_End.toLocaleDateString()
+        document.querySelector(".issue").textContent = formatDate(record.Contract_Date)
+        document.querySelector(".expiration").textContent = formatDate(record.Contract_End)
         const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true })
         const attachmentId = record.Photo
         const photoURL = `${tokenInfo.baseUrl}/attachments/${attachmentId}/download?auth=${tokenInfo.token}`
