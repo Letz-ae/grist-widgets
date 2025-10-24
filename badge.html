@@ -102,25 +102,25 @@
 
 <script async>
     grist.ready()
-    const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true })
     grist.onRecord(async function (record) {
         document.querySelector(".id").textContent = record.Employee_ID
         document.querySelector(".name").textContent = record.Full_Name
         document.querySelector(".position").textContent = record.Position
         document.querySelector(".issue").textContent = formatDate(record.Contract_Date)
         document.querySelector(".expiration").textContent = formatDate(record.Contract_End)
+        const tokenInfo = await grist.docApi.getAccessToken({ readOnly: true })
         const attachmentId = record.Photo
         const photoURL = `${tokenInfo.baseUrl}/attachments/${attachmentId}/download?auth=${tokenInfo.token}`
         
         document.querySelector(".photo img").src = photoURL || ""
+      })
 
-        function formatDate(date) {
-    
-            return [
-                String(date.getDate()).padStart(2, '0'),
-                String(date.getMonth() + 1).padStart(2, '0'),
-                date.getFullYear()
-            ].join('/')
-        }
-    })
+      function formatDate(date) {
+  
+          return [
+              String(date.getDate()).padStart(2, '0'),
+              String(date.getMonth() + 1).padStart(2, '0'),
+              date.getFullYear()
+          ].join('/')
+      }
 </script>
