@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Attachment Download Widget</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root { color-scheme: light dark; }
+    html, body { height: 100%; margin: 0; padding: 10px; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: canvas; color: canvastext;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding-bottom: 10px; border-bottom: 1px solid canvastext;
+    }
+    .controls {
+      display: flex; gap: 10px; align-items: center;
+    }
+    button {
+      padding: 8px 16px; border: none; border-radius: 4px;
+      background: #007bff; color: white; cursor: pointer;
+      font-size: 14px; font-weight: 500;
+    }
+    button:disabled {
+      background: #6c757d; cursor: not-allowed; opacity: 0.6;
+    }
+    button:hover:not(:disabled) {
+      background: #0056b3;
+    }
+    #status {
+      padding: 10px; border-radius: 4px; margin: 10px 0;
+      background: #f8f9fa; color: #212529; border: 1px solid #dee2e6;
+    }
+    #status.error {
+      background: #f8d7da; color: #721c24; border-color: #f5c6cb;
+    }
+    #status.success {
+      background: #d4edda; color: #155724; border-color: #c3e6cb;
+    }
+    #status.info {
+      background: #d1ecf1; color: #0c5460; border-color: #bee5eb;
+    }
+    .stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px; margin: 10px 0;
+    }
+    .stat-card {
+      padding: 10px; border-radius: 4px; background: #f8f9fa;
+      border: 1px solid #dee2e6; text-align: center;
+    }
+    .stat-value {
+      font-size: 24px; font-weight: bold; color: #007bff;
+    }
+    .stat-label {
+      font-size: 12px; color: #6c757d; text-transform: uppercase;
+    }
+    .attachment-list {
+      flex: 1; overflow-y: auto; border: 1px solid #dee2e6;
+      border-radius: 4px; padding: 10px;
+    }
+    .attachment-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px; border-bottom: 1px solid #dee2e6;
+    }
+    .attachment-item:last-child {
+      border-bottom: none;
+    }
+    .attachment-icon {
+      width: 24px; height: 24px; display: flex; align-items: center;
+      justify-content: center; background: #e9ecef; border-radius: 4px;
+    }
+    .attachment-name {
+      flex: 1; font-size: 14px; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .attachment-size {
+      font-size: 12px; color: #6c757d;
+    }
+    .loading {
+      display: inline-block; width: 20px; height: 20px;
+      border: 2px solid #f3f3f3; border-top: 2px solid #007bff;
+      border-radius: 50%; animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>Attachment Download</h2>
+    <div class="controls">
+      <span id="record-count">0 records selected</span>
+      <button id="download-btn" disabled>Download All Attachments</button>
+    </div>
+  </div>
+
+  <div id="status" class="hidden"></div>
+
+  <div class="stats">
+    <div class="stat-card">
+      <div class="stat-value" id="total-files">0</div>
+      <div class="stat-label">Total Files</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="total-size">0 B</div>
+      <div class="stat-label">Total Size</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="selected-records">0</div>
+      <div class="stat-label">Selected Records</div>
+    </div>
+  </div>
+
+  <div class="attachment-list" id="attachment-list">
+    <div class="no-attachments">No attachments found in selected records.</div>
+  </div>
+
+  <script>
+    let currentRecords = [];
+    let tokenInfo = null;
+    let attachmentColumn = null;
+
+    const downloadBtn = document.getElementById('download-btn');
+    const statusDiv = document.getElementById('status');
+    const recordCountSpan = document.getElementById('record-count');
+    const totalFilesSpan = document.getElementById('total-files');
+    const totalSizeSpan = document.getElementById('total-size');
+    const selectedRecordsSpan = document.getElementById('selected-records');
+    const attachmentList = document.getElementById('attachment-list');
+
+    function showStatus(message, type = 'info') {
+      statusDiv.textContent = message;
+      statusDiv.className = type;
+      statusDiv.classList.remove('hidden');
+    }
+
+    function hideStatus() {
+      statusDiv.classList.add('hidden');
+    }
+
+    function updateStats() {
+      const allAttachments = [];
+      currentRecords.forEach(record => {
+        const attachments = record[attachmentColumn];
+        if (Array.isArray(attachments)) {
+          allAttachments.push(...attachments);
+        }
+      });
+
+      const totalSize = allAttachments.reduce((sum, att) => sum + (att.size || 0), 0);
+      const sizeText = formatFileSize(totalSize);
+
+      totalFilesSpan.textContent = allAttachments.length;
+      totalSizeSpan.textContent = sizeText;
+      selectedRecordsSpan.textContent = currentRecords.length;
+      recordCountSpan.textContent = `${currentRecords.length} record${currentRecords.length !== 1 ? 's' : ''} selected`;
+
+      downloadBtn.disabled = allAttachments.length === 0;
+
+      renderAttachmentList(allAttachments);
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function getFileExtension(filename) {
+      return filename.split('.').pop().toLowerCase();
+    }
+
+    function getFileIcon(extension) {
+      const icons = {
+        'pdf': '📄',
+        'doc': '📝', 'docx': '📝',
+        'xls': '📊', 'xlsx': '📊',
+        'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️', 'svg': '🖼️',
+        'zip': '📦', 'rar': '📦', '7z': '📦',
+        'mp3': '🎵', 'wav': '🎵',
+        'mp4': '🎬', 'avi': '🎬', 'mov': '🎬',
+        'txt': '📃',
+        'default': '📎'
+      };
+      return icons[extension] || icons.default;
+    }
+
+    function renderAttachmentList(attachments) {
+      if (attachments.length === 0) {
+        attachmentList.innerHTML = '<div class="no-attachments">No attachments found in selected records.</div>';
+        return;
+      }
+
+      const items = attachments.map(att => {
+        const ext = getFileExtension(att.fileName || 'file');
+        const icon = getFileIcon(ext);
+        const size = formatFileSize(att.size || 0);
+        return `
+          <div class="attachment-item">
+            <div class="attachment-icon">${icon}</div>
+            <div class="attachment-name" title="${att.fileName || 'Unknown file'}">${att.fileName || 'Unknown file'}</div>
+            <div class="attachment-size">${size}</div>
+          </div>
+        `;
+      }).join('');
+
+      attachmentList.innerHTML = items;
+    }
+
+    async function buildAttachmentUrl(attachmentId) {
+      if (!tokenInfo) {
+        tokenInfo = await grist.docApi.getAccessToken({ readOnly: true });
+      }
+      return `${tokenInfo.baseUrl}/attachments/${attachmentId}/download?auth=${tokenInfo.token}`;
+    }
+
+    async function fetchAttachment(attachmentId) {
+      const url = await buildAttachmentUrl(attachmentId);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch attachment: ${response.status}`);
+      }
+      return await response.blob();
+    }
+
+    async function downloadAllAttachments() {
+      try {
+        showStatus('Preparing download...', 'info');
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = '<span class="loading"></span> Processing...';
+
+        const allAttachments = [];
+        currentRecords.forEach(record => {
+          const attachments = record[attachmentColumn];
+          if (Array.isArray(attachments)) {
+            allAttachments.push(...attachments);
+          }
+        });
+
+        if (allAttachments.length === 0) {
+          showStatus('No attachments to download.', 'error');
+          return;
+        }
+
+        showStatus(`Downloading ${allAttachments.length} files...`, 'info');
+
+        const zip = new JSZip();
+        let downloadedCount = 0;
+
+        for (const att of allAttachments) {
+          try {
+            showStatus(`Downloading ${att.fileName || 'file'} (${downloadedCount + 1}/${allAttachments.length})...`, 'info');
+            const blob = await fetchAttachment(att.id);
+            zip.file(att.fileName || `file_${att.id}`, blob);
+            downloadedCount++;
+          } catch (error) {
+            console.error(`Failed to download attachment ${att.id}:`, error);
+          }
+        }
+
+        if (downloadedCount === 0) {
+          showStatus('Failed to download any files.', 'error');
+          return;
+        }
+
+        showStatus(`Creating ZIP file with ${downloadedCount} files...`, 'info');
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        const zipUrl = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = zipUrl;
+        a.download = `attachments_${new Date().toISOString().split('T')[0]}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(zipUrl);
+
+        showStatus(`Successfully downloaded ${downloadedCount} files.`, 'success');
+        
+        setTimeout(() => {
+          hideStatus();
+        }, 3000);
+
+      } catch (error) {
+        console.error('Download error:', error);
+        showStatus(`Error: ${error.message}`, 'error');
+      } finally {
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download All Attachments';
+      }
+    }
+
+    function initializeGrist() {
+      grist.ready({
+        requiredAccess: 'read table',
+        columns: [{
+          name: 'Attachment',
+          title: 'Attachments column',
+          type: 'Attachments',
+          optional: false
+        }]
+      });
+
+      grist.onRecord(function(record) {
+        currentRecords = [record];
+        updateStats();
+      });
+
+      grist.onRecords(function(records) {
+        currentRecords = records || [];
+        updateStats();
+      });
+
+      grist.ready().then(() => {
+        const mapped = grist.mapColumnNames({});
+        for (const key in mapped) {
+          if (mapped[key] === 'Attachment') {
+            attachmentColumn = key;
+            break;
+          }
+        }
+      });
+    }
+
+    downloadBtn.addEventListener('click', downloadAllAttachments);
+    window.addEventListener('DOMContentLoaded', initializeGrist);
+  </script>
+</body>
+</html>
