@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Letz Tax Invoice</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0 }
+
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    background: #f0f0f0;
+    color: #222;
+  }
+
+  /* ── Controls bar ─────────────────────────────── */
+  #controls {
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    background: #1a1a2e;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  #controls button {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    background: rgba(255,255,255,.08);
+    color: #fff;
+    transition: background .15s;
+  }
+
+  #controls button:hover { background: rgba(255,255,255,.18) }
+  #controls button.primary { background: #e8a020; border-color: #e8a020; color: #1a1a2e }
+  #controls button.primary:hover { background: #f0b030 }
+
+  .logo-img { height: 28px; display: block }
+
+  #status { margin-left: auto; font-size: 11px; color: rgba(255,255,255,.45) }
+
+  /* ── Options panel (shown inside Grist widget options sidebar) ── */
+  #options-panel {
+    display: none;
+    padding: 24px;
+    background: #fff;
+    min-height: 100vh;
+  }
+
+  #options-panel h2 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 4px;
+  }
+
+  #options-panel p {
+    font-size: 12px;
+    color: #999;
+    margin-bottom: 20px;
+  }
+
+  .opt-field { margin-bottom: 16px }
+
+  .opt-field label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #888;
+    margin-bottom: 6px;
+  }
+
+  .opt-field input, .opt-field textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    color: #1a1a2e;
+    outline: none;
+    transition: border-color .15s;
+  }
+
+  .opt-field textarea { resize: vertical; min-height: 72px; line-height: 1.5 }
+  .opt-field input:focus, .opt-field textarea:focus { border-color: #1a1a2e }
+
+  .opt-field .hint { font-size: 11px; color: #bbb; margin-top: 4px }
+
+  .opt-save {
+    width: 100%;
+    padding: 10px;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  .opt-save:hover { background: #2a2a4e }
+  .opt-saved { font-size: 11px; color: #27ae60; text-align: center; margin-top: 8px; min-height: 16px }
+
+  /* ── Page wrap ────────────────────────────────── */
+  #page-wrap { padding: 20px }
+
+  /* ── Invoice shell ────────────────────────────── */
+  .invoice-page {
+    background: #fff;
+    width: 794px;
+    margin: 0 auto 32px;
+    box-shadow: 0 3px 16px rgba(0,0,0,.15);
+  }
+
+  .inv-accent { height: 5px; background: #1a1a2e }
+  .inv-body { padding: 32px 38px 36px }
+
+  .inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 22px;
+  }
+
+  .inv-header h1 { font-size: 30px; font-weight: 300; color: #1a1a2e; letter-spacing: -0.5px }
+
+  .inv-logo img { height: 42px; display: block }
+
+  .inv-meta {
+    display: flex;
+    gap: 28px;
+    border-bottom: 1px solid #e8e8e8;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+
+  .inv-meta-item label {
+    display: block;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: #aaa;
+    margin-bottom: 3px;
+  }
+
+  .inv-meta-item span { font-size: 13px; font-weight: 700; color: #1a1a2e }
+
+  .inv-parties {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .party-box {
+    background: #f7f7fa;
+    border: 1px solid #ebebeb;
+    border-radius: 7px;
+    padding: 13px 15px;
+  }
+
+  .party-box h3 {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: #e8a020;
+    margin-bottom: 7px;
+  }
+
+  .party-name { font-size: 12.5px; font-weight: 700; color: #1a1a2e; margin-bottom: 4px }
+  .party-addr { font-size: 11.5px; line-height: 1.65; color: #555 }
+  .trn { font-size: 11px; color: #777; margin-top: 6px }
+  .trn strong { color: #1a1a2e }
+
+  /* ── Line items table ─────────────────────────── */
+  .inv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    margin-bottom: 18px;
+    table-layout: fixed;
+  }
+
+  .inv-table col.c-no    { width: 26px }
+  .inv-table col.c-item  { width: auto }
+  .inv-table col.c-qty   { width: 36px }
+  .inv-table col.c-rate  { width: 100px }
+  .inv-table col.c-amt   { width: 100px }
+  .inv-table col.c-vatp  { width: 34px }
+  .inv-table col.c-vat   { width: 100px }
+  .inv-table col.c-total { width: 108px }
+
+  .inv-table thead tr { background: #1a1a2e }
+
+  .inv-table thead th {
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10.5px;
+    color: #fff;
+  }
+
+  .inv-table thead th.r { text-align: right }
+  .inv-table tbody tr { border-bottom: 0.5px solid #f0f0f0 }
+  .inv-table tbody tr:nth-child(even) { background: #fafafa }
+
+  .inv-table tbody td {
+    padding: 6.5px 8px;
+    color: #333;
+  }
+
+  /* Only clip the item name column, never the numeric columns */
+  .inv-table tbody td:nth-child(2) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .inv-table tbody td.r { text-align: right; font-variant-numeric: tabular-nums }
+
+  /* ── Totals ───────────────────────────────────── */
+  .inv-totals { display: flex; justify-content: flex-end; margin-bottom: 22px }
+
+  .totals-box {
+    width: 300px;
+    border: 1px solid #e8e8e8;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+
+  .totals-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 13px;
+    border-bottom: 0.5px solid #f0f0f0;
+    font-size: 11.5px;
+  }
+
+  .totals-row:last-child { border-bottom: none }
+  .totals-row label { color: #777 }
+  .totals-row span { font-weight: 700; font-variant-numeric: tabular-nums }
+  .totals-row.grand { background: #1a1a2e; padding: 9px 13px }
+  .totals-row.grand label,
+  .totals-row.grand span { color: #fff; font-size: 12.5px }
+
+  /* ── Bank ─────────────────────────────────────── */
+  .inv-bank {
+    border: 1px solid #e8e8e8;
+    border-radius: 7px;
+    padding: 13px 15px;
+    background: #f7f7fa;
+    margin-bottom: 20px;
+  }
+
+  .inv-bank h3 {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: #e8a020;
+    margin-bottom: 10px;
+  }
+
+  .bank-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px 16px }
+  .bank-item label { display: block; font-size: 10px; color: #aaa; margin-bottom: 2px }
+  .bank-item span { font-size: 11.5px; font-weight: 700; color: #1a1a2e }
+
+  /* ── Terms ────────────────────────────────────── */
+  .inv-terms h3 {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.9px;
+    color: #e8a020;
+    margin-bottom: 7px;
+  }
+
+  .inv-terms ol { padding-left: 15px; color: #777; font-size: 10.5px; line-height: 1.75 }
+
+  /* ── Footer ───────────────────────────────────── */
+  .inv-footer {
+    margin-top: 28px;
+    padding-top: 10px;
+    border-top: 1px solid #e8e8e8;
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    color: #bbb;
+  }
+
+  /* ── Empty state ──────────────────────────────── */
+  #empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: #aaa;
+    background: #fff;
+    width: 794px;
+    margin: 20px auto;
+    border-radius: 8px;
+    box-shadow: 0 3px 16px rgba(0,0,0,.1);
+  }
+
+  #empty-state p { font-size: 15px; margin-top: 12px }
+  #empty-state small { font-size: 12px; color: #ccc }
+
+  /* ── Print ────────────────────────────────────── */
+  @media print {
+    body { background: #fff }
+    #controls { display: none }
+    #page-wrap { padding: 0 }
+    .invoice-page { box-shadow: none; margin: 0 }
+  }
+</style>
+</head>
+<body>
+
+<!-- Options panel: shown when Grist opens the widget options sidebar -->
+<div id="options-panel">
+  <img src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/logo/c36911dc-893e-4284-85df-54242bb2c5a9.png" alt="Letz" style="height:32px;margin-bottom:16px;display:block" />
+  <h2>Invoice Widget Settings</h2>
+  <p>These settings are saved per widget instance in your Grist document.</p>
+
+  <div class="opt-field">
+    <label>Invoice Data Column ID</label>
+    <input type="text" id="opt-col" placeholder="Invoice_Data" />
+    <div class="hint">The Grist column that holds the JSON blob (check column ID in column settings)</div>
+  </div>
+
+  <div class="opt-field">
+    <label>From (raw multiline)</label>
+    <textarea id="opt-from" placeholder="L E T Z ORDER MANAGEMENT AND DELIVERY SERVICES L.L.C S.O.C&#10;White Swan Building,&#10;Sheikh Mohammed Bin Zayed Rd,&#10;Dubai, United Arab Emirates (UAE)&#10;VAT Number (TRN): 105170144700003"></textarea>
+    <div class="hint">Rendered exactly as multiple lines in the Billed By block</div>
+  </div>
+
+  <div class="opt-field">
+    <label>Bank Account Name</label>
+    <input type="text" id="opt-bank-name" placeholder="Letz" />
+  </div>
+
+  <div class="opt-field">
+    <label>Bank Account Number</label>
+    <input type="text" id="opt-bank-acct" placeholder="9123491972" />
+  </div>
+
+  <div class="opt-field">
+    <label>IBAN</label>
+    <input type="text" id="opt-bank-iban" placeholder="AE240860000009123491972" />
+  </div>
+
+  <div class="opt-field">
+    <label>SWIFT Code</label>
+    <input type="text" id="opt-bank-swift" placeholder="WIOBAEADXXX" />
+  </div>
+
+  <div class="opt-field">
+    <label>Bank Name</label>
+    <input type="text" id="opt-bank-bank" placeholder="Wio Bank" />
+  </div>
+
+  <button class="opt-save" onclick="saveOptions()">Save Settings</button>
+  <div class="opt-saved" id="opt-saved-msg"></div>
+</div>
+
+<!-- Normal invoice view -->
+<div id="main-view">
+  <div id="controls">
+    <img class="logo-img" src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/logo/c36911dc-893e-4284-85df-54242bb2c5a9.png" alt="Letz" />
+    <button class="primary" onclick="window.print()">&#128438; Print / PDF</button>
+    <span id="status">Waiting for Grist…</span>
+  </div>
+
+  <div id="page-wrap">
+    <div id="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+      </svg>
+      <p>Select an invoice record in Grist</p>
+      <small>The JSON blob in your Invoice_Data column will render as a PDF-ready invoice</small>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   DEFAULTS — used when widget options not yet saved
+   ══════════════════════════════════════════════════ */
+const DEFAULTS = {
+  colId:      'Invoice_Data',
+  from:      'L E T Z ORDER MANAGEMENT AND DELIVERY SERVICES L.L.C S.O.C\nWhite Swan Building,\nSheikh Mohammed Bin Zayed Rd,\nDubai, United Arab Emirates (UAE)\nVAT Number (TRN): 105170144700003',
+  bankName:   'Letz',
+  bankAcct:   '9123491972',
+  bankIban:   'AE240860000009123491972',
+  bankSwift:  'WIOBAEADXXX',
+  bankBank:   'Wio Bank',
+}
+
+let OPTIONS = { ...DEFAULTS }
+let lastRecord = null
+
+/* ══════════════════════════════════════════════════
+   Helpers
+   ══════════════════════════════════════════════════ */
+const esc = s =>
+  String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+
+/* Format a number as AED with thousands separator — no multiplication,
+   takes the stored value directly to avoid any rounding drift */
+const aed = n => {
+  const v = Math.round((parseFloat(n) || 0) * 100) / 100
+  const [int, dec] = v.toFixed(2).split('.')
+  return 'AED\u00a0' + int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec
+}
+
+/* ══════════════════════════════════════════════════
+   Invoice renderer
+   Each item in blob.items must have:
+     name       – line label
+     quantity   – head count
+     unit_cost  – pre-VAT rate per head
+     amount     – (optional) pre-VAT total; computed if absent
+     vat        – (optional) VAT amount; computed if absent
+     total      – (optional) incl-VAT total; computed if absent
+   Using stored amount/vat/total when available prevents rounding
+   errors from unit_cost × qty re-multiplication.
+   ══════════════════════════════════════════════════ */
+function buildHtml(blob) {
+  const items = blob.items || []
+  const VAT_RATE = 0.05
+
+  /* Compute per-row figures, preferring pre-stored values */
+  const rows = items.map((it, idx) => {
+    const qty      = parseFloat(it.quantity)  || 1
+    const rate     = parseFloat(it.unit_cost) || 0
+    /* Use stored amount if available, otherwise derive */
+    const amount   = it.amount != null
+      ? parseFloat(it.amount)
+      : Math.round(rate * qty * 100) / 100
+    const vat      = it.vat != null
+      ? parseFloat(it.vat)
+      : Math.round(amount * VAT_RATE * 100) / 100
+    const total    = it.total != null
+      ? parseFloat(it.total)
+      : Math.round((amount + vat) * 100) / 100
+
+    return { name: it.name, qty, rate, amount, vat, total }
+  })
+
+  /* Grand totals summed from per-row values (no re-multiplication) */
+  const subtotal  = rows.reduce((s, r) => s + r.amount, 0)
+  const totalVat  = rows.reduce((s, r) => s + r.vat,    0)
+  const grand     = rows.reduce((s, r) => s + r.total,  0)
+
+  const o = OPTIONS
+
+  /* Render From/To as raw multiline text blocks */
+  const fromText   = (blob.from || o.from || '').toString()
+  const toText     = (blob.to || '').toString()
+  const fromHtml   = esc(fromText || '—').replace(/\n/g, '<br>')
+  const toHtml     = esc(toText || '—').replace(/\n/g, '<br>')
+  const toFirstLine = (toText.split('\n')[0] || '—').trim() || '—'
+
+  const rowsHtml = rows.map((r, i) => `
+    <tr>
+      <td>${i + 1}.</td>
+      <td title="${esc(r.name)}">${esc(r.name)}</td>
+      <td class="r">${r.qty}</td>
+      <td class="r">${aed(r.rate)}</td>
+      <td class="r">${aed(r.amount)}</td>
+      <td class="r">5%</td>
+      <td class="r">${aed(r.vat)}</td>
+      <td class="r">${aed(r.total)}</td>
+    </tr>`).join('')
+
+  return `
+<div class="invoice-page">
+  <div class="inv-accent"></div>
+  <div class="inv-body">
+
+    <div class="inv-header">
+      <h1>Tax Invoice</h1>
+      <div class="inv-logo"><img src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/logo/c36911dc-893e-4284-85df-54242bb2c5a9.png" alt="Letz" /></div>
+    </div>
+
+    <div class="inv-meta">
+      <div class="inv-meta-item"><label>Invoice No</label><span>${esc(blob.number || '—')}</span></div>
+      <div class="inv-meta-item"><label>Invoice Date</label><span>${esc(blob.date || '—')}</span></div>
+      <div class="inv-meta-item"><label>Due Date</label><span>${esc(blob.due_date || '—')}</span></div>
+    </div>
+
+    <div class="inv-parties">
+      <div class="party-box">
+        <h3>Billed By</h3>
+        <div class="party-addr">${fromHtml}</div>
+      </div>
+      <div class="party-box">
+        <h3>Billed To</h3>
+        <div class="party-addr">${toHtml}</div>
+      </div>
+    </div>
+
+    <table class="inv-table">
+      <colgroup>
+        <col class="c-no"/><col class="c-item"/><col class="c-qty"/>
+        <col class="c-rate"/><col class="c-amt"/><col class="c-vatp"/>
+        <col class="c-vat"/><col class="c-total"/>
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th><th>Item</th>
+          <th class="r">Qty</th><th class="r">Rate</th>
+          <th class="r">Amount</th><th class="r">VAT%</th>
+          <th class="r">VAT</th><th class="r">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml || '<tr><td colspan="8" style="text-align:center;color:#bbb;padding:24px">No line items</td></tr>'}
+      </tbody>
+    </table>
+
+    <div class="inv-totals">
+      <div class="totals-box">
+        <div class="totals-row"><label>Amount</label><span>${aed(subtotal)}</span></div>
+        <div class="totals-row"><label>VAT (5%)</label><span>${aed(totalVat)}</span></div>
+        <div class="totals-row grand"><label>Total (AED)</label><span>${aed(grand)}</span></div>
+      </div>
+    </div>
+
+    <div class="inv-bank">
+      <h3>Bank Details</h3>
+      <div class="bank-grid">
+        <div class="bank-item"><label>Account Name</label><span>${esc(o.bankName)}</span></div>
+        <div class="bank-item"><label>Account Number</label><span>${esc(o.bankAcct)}</span></div>
+        <div class="bank-item"><label>IBAN</label><span>${esc(o.bankIban)}</span></div>
+        <div class="bank-item"><label>SWIFT Code</label><span>${esc(o.bankSwift)}</span></div>
+        <div class="bank-item"><label>Bank</label><span>${esc(o.bankBank)}</span></div>
+      </div>
+    </div>
+
+    <div class="inv-terms">
+      <h3>Terms and Conditions</h3>
+      <ol>
+        <li>Please pay within 30 days from the date of invoice, overdue interest @ 10% will be charged on delayed payments.</li>
+        <li>Please quote invoice number when remitting funds.</li>
+      </ol>
+    </div>
+
+    <div class="inv-footer">
+      <span>Invoice No ${esc(blob.number || '—')} &nbsp;|&nbsp; ${esc(blob.date || '')} &nbsp;|&nbsp; Billed To ${esc(toFirstLine)}</span>
+      <span>This is an electronically generated document, no signature is required.</span>
+    </div>
+
+  </div>
+</div>`
+}
+
+/* ══════════════════════════════════════════════════
+   Widget options panel
+   ══════════════════════════════════════════════════ */
+function populateOptionsForm(opts) {
+  document.getElementById('opt-col').value       = opts.colId    || DEFAULTS.colId
+  document.getElementById('opt-from').value      = opts.from     || DEFAULTS.from
+  document.getElementById('opt-bank-name').value = opts.bankName || DEFAULTS.bankName
+  document.getElementById('opt-bank-acct').value = opts.bankAcct || DEFAULTS.bankAcct
+  document.getElementById('opt-bank-iban').value = opts.bankIban || DEFAULTS.bankIban
+  document.getElementById('opt-bank-swift').value= opts.bankSwift|| DEFAULTS.bankSwift
+  document.getElementById('opt-bank-bank').value = opts.bankBank || DEFAULTS.bankBank
+}
+
+async function saveOptions() {
+  const opts = {
+    colId:    document.getElementById('opt-col').value.trim()    || DEFAULTS.colId,
+    from:     document.getElementById('opt-from').value.trim()   || DEFAULTS.from,
+    bankName: document.getElementById('opt-bank-name').value.trim()  || DEFAULTS.bankName,
+    bankAcct: document.getElementById('opt-bank-acct').value.trim()  || DEFAULTS.bankAcct,
+    bankIban: document.getElementById('opt-bank-iban').value.trim()  || DEFAULTS.bankIban,
+    bankSwift:document.getElementById('opt-bank-swift').value.trim() || DEFAULTS.bankSwift,
+    bankBank: document.getElementById('opt-bank-bank').value.trim()  || DEFAULTS.bankBank,
+  }
+
+  OPTIONS = opts
+
+  if (window.grist) {
+    await grist.setOptions(opts)
+  }
+
+  /* Re-render current invoice with new settings */
+  if (lastRecord) renderRecord(lastRecord)
+
+  const msg = document.getElementById('opt-saved-msg')
+  msg.textContent = '✓ Settings saved'
+  setTimeout(() => { msg.textContent = '' }, 2500)
+}
+
+/* ══════════════════════════════════════════════════
+   Record rendering
+   ══════════════════════════════════════════════════ */
+function parseBlob(raw) {
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('status')
+  if (el) el.textContent = msg
+}
+
+function showEmpty() {
+  document.getElementById('page-wrap').innerHTML = `
+  <div id="empty-state">
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+    </svg>
+    <p>Select an invoice record in Grist</p>
+    <small>The JSON blob in your <strong>${OPTIONS.colId}</strong> column will render here</small>
+  </div>`
+}
+
+function renderRecord(record) {
+  lastRecord = record
+  const blob = parseBlob(record[OPTIONS.colId])
+  if (!blob) {
+    showEmpty()
+    setStatus(`Column "${OPTIONS.colId}" is empty or not valid JSON`)
+    return
+  }
+  document.getElementById('page-wrap').innerHTML = buildHtml(blob)
+  setStatus(`Invoice ${blob.number || '?'} · ${(blob.items || []).length} line items`)
+}
+
+/* ══════════════════════════════════════════════════
+   Grist integration
+   ══════════════════════════════════════════════════ */
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script')
+    s.src = src; s.onload = res; s.onerror = rej
+    document.head.appendChild(s)
+  })
+}
+
+async function init() {
+  try { await loadScript('https://docs.getgrist.com/grist-plugin-api.js') }
+  catch { setStatus('Demo mode'); loadDemo(); return }
+
+  if (!window.grist) { setStatus('Demo mode'); loadDemo(); return }
+
+  grist.ready({
+    requiredAccess: 'read table',
+    /* Tells Grist this widget has configurable options —
+       adds a gear icon that opens our options panel */
+    hasCustomOptions: true,
+  })
+
+  /* Called when user opens the widget options panel */
+  grist.onOptions((options, interaction) => {
+    const isEditing = interaction && interaction.mode === 'edit'
+
+    if (isEditing) {
+      /* Show the options form, hide the invoice */
+      document.getElementById('options-panel').style.display = 'block'
+      document.getElementById('main-view').style.display = 'none'
+      populateOptionsForm(options || {})
+    } else {
+      /* Normal view — apply saved options */
+      document.getElementById('options-panel').style.display = 'none'
+      document.getElementById('main-view').style.display = 'block'
+      if (options && Object.keys(options).length > 0) {
+        OPTIONS = { ...DEFAULTS, ...options }
+      }
+    }
+  })
+
+  grist.onRecord(record => {
+    if (!record) { showEmpty(); setStatus('No record selected'); return }
+    renderRecord(record)
+  })
+}
+
+/* ── Demo (outside Grist) ──────────────────────── */
+function loadDemo() {
+  const blob = {
+    number:   '2602231',
+    date:     '28 Feb 2026',
+    due_date: '30 Mar 2026',
+    to: [
+      'Sharjah Coop',
+      'PO. BOX – 5435 SHJ',
+      '464 Sheikh Humaid Bin Saqr Al Qassimi St, Al Yarmook',
+      'Sharjah, United Arab Emirates (UAE)',
+      'VAT Number (TRN): 100014634800003',
+    ].join('\n'),
+    items: [
+      { name:'Al Dhaid - Pickers',          quantity:82,  unit_cost:121.59, amount:9970.38,  vat:498.52,  total:10468.90 },
+      { name:'Al Dhaid - OP',               quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Al Khan - Pickers',            quantity:110, unit_cost:121.12, amount:13323.20, vat:666.16,  total:13989.36 },
+      { name:'Al Khan - OP',                quantity:47,  unit_cost:176.85, amount:8311.95,  vat:415.60,  total:8727.55  },
+      { name:'Al Qarain - Pickers',          quantity:124, unit_cost:119.74, amount:14847.76, vat:742.39,  total:15590.15 },
+      { name:'Al Qarain - OP',              quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Al Riqqa - Pickers',           quantity:120, unit_cost:121.39, amount:14566.80, vat:728.34,  total:15295.14 },
+      { name:'Al Riqqa - OP',               quantity:42,  unit_cost:177.49, amount:7454.58,  vat:372.73,  total:7827.31  },
+      { name:'Rahmaniya - Pickers',          quantity:92,  unit_cost:121.33, amount:11162.36, vat:558.12,  total:11720.48 },
+      { name:'Rahmaniya - OP',              quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Sweihat - Pickers',            quantity:63,  unit_cost:121.15, amount:7632.45,  vat:381.62,  total:8014.07  },
+      { name:'Sweihat - OP',                quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Halwan - Pickers',             quantity:92,  unit_cost:121.59, amount:11186.28, vat:559.31,  total:11745.59 },
+      { name:'Halwan - OP',                 quantity:41,  unit_cost:177.64, amount:7283.24,  vat:364.16,  total:7647.40  },
+      { name:'Suyoh - Pickers',             quantity:139, unit_cost:121.59, amount:16901.01, vat:845.05,  total:17746.06 },
+      { name:'Suyoh - OP',                  quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Khor Fakkan - Pickers',        quantity:112, unit_cost:121.59, amount:13618.08, vat:680.90,  total:14298.98 },
+      { name:'Khor Fakkan - OP',            quantity:56,  unit_cost:180.42, amount:10103.52, vat:505.18,  total:10608.70 },
+      { name:'Gate Tower - Pickers',         quantity:112, unit_cost:121.59, amount:13618.08, vat:680.90,  total:14298.98 },
+      { name:'Gate Tower - OP',             quantity:37,  unit_cost:178.65, amount:6610.05,  vat:330.50,  total:6940.55  },
+      { name:'Kalba - Pickers',              quantity:55,  unit_cost:122.02, amount:6711.10,  vat:335.56,  total:7046.66  },
+      { name:'Kalba - OP',                  quantity:28,  unit_cost:180.42, amount:5051.76,  vat:252.59,  total:5304.35  },
+      { name:'Al Waha - Pickers',            quantity:28,  unit_cost:121.59, amount:3404.52,  vat:170.23,  total:3574.75  },
+      { name:'Al Waha - OP',                quantity:28,  unit_cost:180.42, amount:5051.76,  vat:252.59,  total:5304.35  },
+      { name:'Muweilah - Pickers',           quantity:28,  unit_cost:121.59, amount:3404.52,  vat:170.23,  total:3574.75  },
+      { name:'Muweilah - OP',               quantity:28,  unit_cost:180.42, amount:5051.76,  vat:252.59,  total:5304.35  },
+      { name:'Fulfilment Center - Pickers',  quantity:437, unit_cost:120.18, amount:52518.66, vat:2625.93, total:55144.59 },
+      { name:'Supervisors',                  quantity:56,  unit_cost:231.40, amount:12958.40, vat:647.92,  total:13606.32 },
+      { name:'Trainers',                     quantity:28,  unit_cost:305.00, amount:8540.00,  vat:427.00,  total:8967.00  },
+    ]
+  }
+  lastRecord = { Invoice_Data: JSON.stringify(blob) }
+  document.getElementById('page-wrap').innerHTML = buildHtml(blob)
+  setStatus(`Demo · Invoice ${blob.number} · ${blob.items.length} line items`)
+}
+
+init()
+</script>
+</body>
+</html>
