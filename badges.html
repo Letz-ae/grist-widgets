@@ -8,8 +8,8 @@
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <style>
         :root {
-            --badge-scale: 1.54;
-        }
+                    --badge-scale: 1;
+                }
 
         * {
             margin: 0;
@@ -37,8 +37,8 @@
 
         /* Individual badge container */
         .badge-container {
-            width: calc(85mm * var(--badge-scale));
-            height: calc(55mm * var(--badge-scale));
+            width: calc(85.6mm * var(--badge-scale));
+            height: calc(54mm * var(--badge-scale));
             position: relative;
             border: 0.5mm solid #eee;
             page-break-inside: avoid;
@@ -118,13 +118,21 @@
 
         /* Print styles - let CSS handle page breaks naturally */
         @media print {
+            @page {
+                size: A4;
+                margin: 10mm;
+            }
+
             body {
                 margin: 0;
                 padding: 0;
             }
 
             .badges-container {
-                margin: 10mm;
+                width: auto;
+                margin: 0;
+                padding: 0;
+                gap: 4mm;
                 box-shadow: none;
             }
 
@@ -132,7 +140,6 @@
                 border: 0.3mm solid #ddd;
             }
 
-            /* Hide non-essential elements when printing */
             .no-print {
                 display: none !important;
             }
@@ -206,7 +213,7 @@
                     <div class="content position absolute">${record.Position || ''}</div>
                     <div class="content company absolute">LETZ</div>
                     <div class="content issue absolute">Issued: ${formatDate(issueDate) || '—'}</div>
-                    <div class="content expiration absolute">${formatDate(expiryDate) || '—'}</div>
+                    <div class="content expiration absolute">Exp: ${formatDate(expiryDate) || '—'}</div>
 
                     <div class="content photo absolute">
                         <img src="${photoURL || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlBob3RvPC90ZXh0Pjwvc3ZnPg=='}" alt="ID Photo">
@@ -227,23 +234,36 @@
         }
 
         function parseDate(value) {
-            if (!value) return null;
+            if (!value || value === 'None') return null;
             if (value instanceof Date) return isNaN(value) ? null : value;
+
             if (typeof value === 'number') {
-                const d = new Date(value);
+                // Grist can provide ms timestamps, seconds timestamps, or serial day values.
+                let d;
+                if (value > 1e12) {
+                    d = new Date(value); // milliseconds
+                } else if (value > 1e9) {
+                    d = new Date(value * 1000); // seconds
+                } else {
+                    d = new Date(Date.UTC(1970, 0, 1) + (value * 86400000)); // days since epoch
+                }
                 return isNaN(d) ? null : d;
             }
+
             if (typeof value === 'string') {
                 const s = value.trim();
                 if (!s) return null;
+
                 const iso = new Date(s);
                 if (!isNaN(iso)) return iso;
+
                 const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
                 if (m) {
                     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
                     return isNaN(d) ? null : d;
                 }
             }
+
             return null;
         }
 
