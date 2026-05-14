@@ -54,6 +54,10 @@
         .badge-container img.background {
             width: 100%;
             height: 100%;
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            object-fit: cover;
         }
 
         .content {
@@ -62,6 +66,7 @@
             left: 0;
             width: 100%;
             height: 100%;
+            z-index: 1;
         }
 
         .id {
@@ -300,7 +305,7 @@
                     <div class="content position absolute">${record.Position || ''}</div>
                     <div class="content company absolute">LETZ</div>
                     <div class="content issue absolute">${formatDate(issueDate) || '—'}</div>
-                    <div class="content expiration absolute">Exp: ${formatDate(expiryDate) || '—'}</div>
+                    <div class="content expiration absolute">${formatDate(expiryDate) || '—'}</div>
 
                     <div class="content photo absolute">
                         <img src="${photoURL || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlBob3RvPC90ZXh0Pjwvc3ZnPg=='}" alt="ID Photo">
