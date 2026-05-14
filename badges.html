@@ -54,10 +54,6 @@
         .badge-container img.background {
             width: 100%;
             height: 100%;
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-            object-fit: cover;
         }
 
         .content {
@@ -66,7 +62,6 @@
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 1;
         }
 
         .id {
@@ -296,13 +291,8 @@
 
         async function generateBadge(record) {
             const photoURL = await getPhotoURL(record.Photo)
-            const issueDate =
-                record.Contract_Date ||
-                record.Start_Contract ||
-                record.Contract_Start ||
-                record.Contract_Start_Date ||
-                null
-            const expiryDate = record.Contract_Expiration || record.Contract_End || record.End_Contract || null
+            const issueDate = record.Contract_Date || null
+            const expiryDate = getBadgeExpiry(record)
             return `
                 <div class="badge-container">
                     <div class="content id absolute">${record.Employee_ID || ''}</div>
@@ -310,7 +300,7 @@
                     <div class="content position absolute">${record.Position || ''}</div>
                     <div class="content company absolute">LETZ</div>
                     <div class="content issue absolute">${formatDate(issueDate) || '—'}</div>
-                    <div class="content expiration absolute">${formatDate(expiryDate) || '—'}</div>
+                    <div class="content expiration absolute">Exp: ${formatDate(expiryDate) || '—'}</div>
 
                     <div class="content photo absolute">
                         <img src="${photoURL || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPlBob3RvPC90ZXh0Pjwvc3ZnPg=='}" alt="ID Photo">
@@ -385,12 +375,6 @@
                     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
                     return isNaN(d) ? null : d
                 }
-
-                const m2 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
-                if (m2) {
-                    const d = new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]))
-                    return isNaN(d) ? null : d
-                }
             }
 
             return null
@@ -406,7 +390,25 @@
             ].join('/')
         }
 
+        function getBadgeExpiry(record) {
+            const emiratesExpiry = parseDate(
+                record.Emirates_ID_Validity ||
+                record.Emirates_ID_Expiry_Check ||
+                record.Emirates_ID_Expiration
+            )
 
+            const contractEnd = parseDate(
+                record.End_Contract ||
+                record.Contract_End ||
+                record.Contract_Expiration
+            )
+
+            if (emiratesExpiry && contractEnd) {
+                return emiratesExpiry <= contractEnd ? emiratesExpiry : contractEnd
+            }
+
+            return emiratesExpiry || contractEnd || null
+        }
 
         function generateBadges(records) {
             const badgesContainer = document.getElementById('badges-container')
@@ -451,10 +453,11 @@
                 'Contract_Date',
                 'Contract_Start',
                 'Contract_Start_Date',
-                'Start_Contract',
                 'Contract_Expiration',
                 'Contract_End',
                 'End_Contract',
+                'Emirates_ID_Validity',
+                'Emirates_ID_Expiry_Check',
                 'Training_Date',
                 'Photo'
             ]
