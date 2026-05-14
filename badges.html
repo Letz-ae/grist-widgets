@@ -223,10 +223,37 @@
             `;
         }
 
-        async function getPhotoURL(attachmentId) {
-            if (!attachmentId || !tokenInfo) return '';
+        function extractAttachmentId(value) {
+            if (value == null) return null;
+            if (typeof value === 'number') return value;
+            if (typeof value === 'string') {
+                const n = Number(value);
+                return Number.isFinite(n) ? n : null;
+            }
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    const id = extractAttachmentId(v);
+                    if (id != null) return id;
+                }
+            }
+            if (typeof value === 'object' && typeof value.id === 'number') return value.id;
+            return null;
+        }
+
+        async function ensureToken() {
+            if (!tokenInfo || tokenInfo.expiresAt < Date.now() + 60000) {
+                tokenInfo = await grist.docApi.getAccessToken({ readOnly: true });
+                tokenInfo.expiresAt = Date.now() + (tokenInfo.ttlMsecs ?? 3600000);
+            }
+            return tokenInfo;
+        }
+
+        async function getPhotoURL(attachmentValue) {
             try {
-                return `${tokenInfo.baseUrl}/attachments/${attachmentId}/download?auth=${tokenInfo.token}`;
+                const attachmentId = extractAttachmentId(attachmentValue);
+                if (!attachmentId) return '';
+                const t = await ensureToken();
+                return `${t.baseUrl}/attachments/${attachmentId}/download?auth=${t.token}`;
             } catch (error) {
                 console.error('Error getting photo URL:', error);
                 return '';
@@ -293,10 +320,8 @@
         // Grist integration
         grist.ready();
 
-        // Get access token for photo URLs
-        grist.docApi.getAccessToken({ readOnly: true }).then(token => {
-            tokenInfo = token;
-        });
+        // Warm token cache for photo URLs
+        ensureToken().catch(() => {});
 
         // Handle records from Grist
         grist.onRecord(function(record) {
