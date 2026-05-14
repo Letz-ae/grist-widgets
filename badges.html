@@ -9,6 +9,13 @@
     <style>
 
 
+        :root {
+            --badge-w: 8.56cm;
+            --badge-h: 5.40cm;
+            --badge-gap-screen: 0.4cm;
+            --badge-gap-print: 0.3cm;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -29,14 +36,14 @@
             padding: 1cm 0;
             display: flex;
             flex-wrap: wrap;
-            gap: 0.4cm;
+            gap: var(--badge-gap-screen);
             align-content: flex-start;
         }
 
         /* Individual badge container */
         .badge-container {
-            width: 8.56cm;
-            height: 5.4cm;
+            width: var(--badge-w);
+            height: var(--badge-h);
             position: relative;
             border: 0.03cm solid #eee;
             page-break-inside: avoid;
@@ -130,7 +137,7 @@
                 width: 19cm;
                 margin: 0 auto;
                 padding: 0;
-                gap: 0.3cm;
+                gap: var(--badge-gap-print);
                 box-shadow: none;
             }
 
@@ -175,6 +182,23 @@
                 margin-right: 10px;
             }
 
+            .size-preset-control {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                color: #334155;
+                margin-left: 6px;
+            }
+
+            .size-preset-control select {
+                padding: 6px 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 5px;
+                font-size: 14px;
+                background: #fff;
+                color: #0f172a;
+            }
 
             button:hover {
                 background: #0056b3;
@@ -192,6 +216,14 @@
         <h2>Badge Printing Layout</h2>
         <p>This layout uses natural flow for badges across A4 pages</p>
         <button onclick="window.print()">Print Badges</button>
+        <label class="size-preset-control" for="badge-size-preset">
+            Badge size
+            <select id="badge-size-preset" onchange="setBadgeSizePreset(this.value)">
+                <option value="credit" selected>Credit card (8.56 × 5.40 cm)</option>
+                <option value="small">Small (8.40 × 5.30 cm)</option>
+                <option value="wide">Wider (8.70 × 5.50 cm)</option>
+            </select>
+        </label>
     </div>
 
     <!-- All badges in a single container that spans pages -->
@@ -200,6 +232,39 @@
     <script>
         let allRecords = [];
         let tokenInfo = null;
+
+        const SIZE_PRESETS = {
+            credit: { w: 8.56, h: 5.40, gapScreen: 0.4, gapPrint: 0.3 },
+            small:  { w: 8.40, h: 5.30, gapScreen: 0.35, gapPrint: 0.25 },
+            wide:   { w: 8.70, h: 5.50, gapScreen: 0.35, gapPrint: 0.25 },
+        };
+
+        function applySizePreset(name) {
+            const p = SIZE_PRESETS[name] || SIZE_PRESETS.credit;
+            const root = document.documentElement;
+            root.style.setProperty('--badge-w', `${p.w.toFixed(2)}cm`);
+            root.style.setProperty('--badge-h', `${p.h.toFixed(2)}cm`);
+            root.style.setProperty('--badge-gap-screen', `${p.gapScreen.toFixed(2)}cm`);
+            root.style.setProperty('--badge-gap-print', `${p.gapPrint.toFixed(2)}cm`);
+        }
+
+        function setBadgeSizePreset(name) {
+            applySizePreset(name);
+            try {
+                localStorage.setItem('badgeSizePreset', name);
+            } catch (_) {}
+        }
+
+        function initBadgeSizePreset() {
+            let preset = 'credit';
+            try {
+                const saved = localStorage.getItem('badgeSizePreset');
+                if (saved && SIZE_PRESETS[saved]) preset = saved;
+            } catch (_) {}
+            applySizePreset(preset);
+            const sel = document.getElementById('badge-size-preset');
+            if (sel) sel.value = preset;
+        }
 
         async function generateBadge(record) {
             const photoURL = await getPhotoURL(record.Photo);
@@ -317,6 +382,9 @@
         }
 
 
+
+        // Initialize badge physical-size preset
+        initBadgeSizePreset();
 
         // Grist integration
         grist.ready();
