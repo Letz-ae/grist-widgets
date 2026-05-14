@@ -296,7 +296,12 @@
 
         async function generateBadge(record) {
             const photoURL = await getPhotoURL(record.Photo)
-            const issueDate = record.Contract_Date || null
+            const issueDate =
+                record.Contract_Date ||
+                record.Start_Contract ||
+                record.Contract_Start ||
+                record.Contract_Start_Date ||
+                null
             const expiryDate = getBadgeExpiry(record)
             return `
                 <div class="badge-container">
@@ -380,6 +385,12 @@
                     const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
                     return isNaN(d) ? null : d
                 }
+
+                const m2 = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+                if (m2) {
+                    const d = new Date(Number(m2[3]), Number(m2[2]) - 1, Number(m2[1]))
+                    return isNaN(d) ? null : d
+                }
             }
 
             return null
@@ -458,6 +469,7 @@
                 'Contract_Date',
                 'Contract_Start',
                 'Contract_Start_Date',
+                'Start_Contract',
                 'Contract_Expiration',
                 'Contract_End',
                 'End_Contract',
