@@ -9,7 +9,7 @@
     <style>
         :root {
                     --badge-scale: 1;
-                    --badge-print-scale: 1.18;
+                    --badge-print-scale: 1.04;
                 }
 
         * {
@@ -137,7 +137,7 @@
                 width: auto;
                 margin: 0;
                 padding: 0;
-                gap: 4mm;
+                gap: 2mm;
                 box-shadow: none;
             }
 
@@ -220,8 +220,12 @@
             Print scale
             <select id="print-scale" onchange="setPrintScale(this.value)">
                 <option value="1.00">100%</option>
+                <option value="1.02">102%</option>
+                <option value="1.04" selected>104%</option>
+                <option value="1.06">106%</option>
                 <option value="1.08">108%</option>
-                <option value="1.18" selected>118%</option>
+                <option value="1.10">110%</option>
+                <option value="1.18">118%</option>
                 <option value="1.25">125%</option>
             </select>
         </label>
@@ -244,7 +248,7 @@
         }
 
         function initPrintScale() {
-            let scale = '1.18';
+            let scale = '1.04';
             try {
                 const saved = localStorage.getItem('badgePrintScale');
                 if (saved) scale = saved;
