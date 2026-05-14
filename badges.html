@@ -182,6 +182,24 @@
                 margin-right: 10px;
             }
 
+            .print-scale-control {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                font-size: 14px;
+                color: #334155;
+                margin-left: 6px;
+            }
+
+            .print-scale-control select {
+                padding: 6px 8px;
+                border: 1px solid #cbd5e1;
+                border-radius: 5px;
+                font-size: 14px;
+                background: #fff;
+                color: #0f172a;
+            }
+            
             button:hover {
                 background: #0056b3;
             }
@@ -198,6 +216,15 @@
         <h2>Badge Printing Layout</h2>
         <p>This layout uses natural flow for badges across A4 pages</p>
         <button onclick="window.print()">Print Badges</button>
+        <label class="print-scale-control" for="print-scale">
+            Print scale
+            <select id="print-scale" onchange="setPrintScale(this.value)">
+                <option value="1.00">100%</option>
+                <option value="1.08">108%</option>
+                <option value="1.18" selected>118%</option>
+                <option value="1.25">125%</option>
+            </select>
+        </label>
     </div>
 
     <!-- All badges in a single container that spans pages -->
@@ -206,6 +233,36 @@
     <script>
         let allRecords = [];
         let tokenInfo = null;
+
+        function setPrintScale(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n) || n <= 0) return;
+            document.documentElement.style.setProperty('--badge-print-scale', String(n));
+            try {
+                localStorage.setItem('badgePrintScale', String(n));
+            } catch (_) {}
+        }
+
+        function initPrintScale() {
+            let scale = '1.18';
+            try {
+                const saved = localStorage.getItem('badgePrintScale');
+                if (saved) scale = saved;
+            } catch (_) {}
+
+            setPrintScale(scale);
+            const sel = document.getElementById('print-scale');
+            if (!sel) return;
+
+            const exists = Array.from(sel.options).some(o => o.value === scale);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = scale;
+                opt.textContent = `${Math.round(Number(scale) * 100)}%`;
+                sel.appendChild(opt);
+            }
+            sel.value = scale;
+        }
 
         async function generateBadge(record) {
             const photoURL = await getPhotoURL(record.Photo);
@@ -321,6 +378,9 @@
                     badgesContainer.innerHTML = badges.join('');
                 });
         }
+
+        // Initialize local print-scale preference
+        initPrintScale();
 
         // Grist integration
         grist.ready();
