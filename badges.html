@@ -8,13 +8,11 @@
     <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
     <style>
 
-
         :root {
             --badge-w: 8.56cm;
             --badge-h: 5.40cm;
             --badge-gap-screen: 0.4cm;
             --badge-gap-print: 0.3cm;
-            --print-compensation: 1.43;
         }
 
         * {
@@ -124,27 +122,42 @@
             object-fit: cover;
         }
 
-        /* Print styles - fixed A4 layout in cm for reliable sizing */
+        /* ─── PRINT STYLES ─────────────────────────────────────────────────────────
+           The critical fix: browsers apply a default "fit to page" scaling when
+           printing. We force scale(1) by setting the page to exactly 21cm × 29.7cm
+           with zero margins and locking html/body to those exact dimensions so the
+           browser has no reason to shrink content.
+        ──────────────────────────────────────────────────────────────────────────── */
         @media print {
             @page {
-                size: A4;
+                size: 21cm 29.7cm;   /* explicit A4, not the keyword "A4" */
                 margin: 0;
             }
 
-            html, body {
+            html {
+                width: 21cm;
+                height: 29.7cm;
+                /* Prevent any UA zoom / fit-to-page scaling */
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            body {
                 width: 21cm;
                 margin: 0;
                 padding: 0;
+                background: white;
             }
 
             .badges-container {
-                width: calc((var(--badge-w) * var(--print-compensation) * 2) + var(--badge-gap-print));
+                /* Two badges side-by-side with known gap ─ total ≈ 17.42cm, centred on 21cm */
+                width: calc(var(--badge-w) * 2 + var(--badge-gap-print));
                 margin: 1cm auto 0;
                 padding: 0;
                 box-shadow: none;
                 display: grid;
-                grid-template-columns: repeat(2, calc(var(--badge-w) * var(--print-compensation)));
-                grid-auto-rows: calc(var(--badge-h) * var(--print-compensation));
+                grid-template-columns: repeat(2, var(--badge-w));
+                grid-auto-rows: var(--badge-h);
                 column-gap: var(--badge-gap-print);
                 row-gap: var(--badge-gap-print);
                 justify-content: center;
@@ -153,8 +166,6 @@
 
             .badge-container {
                 border: 0.03cm solid #c0c0c0;
-                transform: scale(var(--print-compensation));
-                transform-origin: top left;
             }
 
             .no-print {
@@ -212,24 +223,6 @@
                 color: #0f172a;
             }
 
-            .comp-control {
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                font-size: 14px;
-                color: #334155;
-                margin-left: 10px;
-            }
-
-            .comp-control select {
-                padding: 6px 8px;
-                border: 1px solid #cbd5e1;
-                border-radius: 5px;
-                font-size: 14px;
-                background: #fff;
-                color: #0f172a;
-            }
-
             button:hover {
                 background: #0056b3;
             }
@@ -254,91 +247,52 @@
                 <option value="wide">Wider (8.70 × 5.50 cm)</option>
             </select>
         </label>
-        <label class="comp-control" for="print-compensation-select">
-            Print compensation
-            <select id="print-compensation-select" onchange="setPrintCompensation(this.value)">
-                <option value="1.00">1.00x</option>
-                <option value="1.15">1.15x</option>
-                <option value="1.30">1.30x</option>
-                <option value="1.43" selected>1.43x</option>
-                <option value="1.50">1.50x</option>
-            </select>
-        </label>
     </div>
 
     <!-- All badges in a single container that spans pages -->
     <div id="badges-container" class="badges-container"></div>
 
     <script>
-        let allRecords = [];
-        let tokenInfo = null;
+        let allRecords = []
+        let tokenInfo = null
 
         const SIZE_PRESETS = {
-            credit: { w: 8.56, h: 5.40, gapScreen: 0.4, gapPrint: 0.20 },
+            credit: { w: 8.56, h: 5.40, gapScreen: 0.4, gapPrint: 0.30 },
             small:  { w: 8.40, h: 5.30, gapScreen: 0.35, gapPrint: 0.15 },
             wide:   { w: 8.70, h: 5.50, gapScreen: 0.35, gapPrint: 0.15 },
-        };
+        }
 
         function applySizePreset(name) {
-            const p = SIZE_PRESETS[name] || SIZE_PRESETS.credit;
-            const root = document.documentElement;
-            root.style.setProperty('--badge-w', `${p.w.toFixed(2)}cm`);
-            root.style.setProperty('--badge-h', `${p.h.toFixed(2)}cm`);
-            root.style.setProperty('--badge-gap-screen', `${p.gapScreen.toFixed(2)}cm`);
-            root.style.setProperty('--badge-gap-print', `${p.gapPrint.toFixed(2)}cm`);
+            const p = SIZE_PRESETS[name] || SIZE_PRESETS.credit
+            const root = document.documentElement
+            root.style.setProperty('--badge-w', `${p.w.toFixed(2)}cm`)
+            root.style.setProperty('--badge-h', `${p.h.toFixed(2)}cm`)
+            root.style.setProperty('--badge-gap-screen', `${p.gapScreen.toFixed(2)}cm`)
+            root.style.setProperty('--badge-gap-print', `${p.gapPrint.toFixed(2)}cm`)
         }
 
         function setBadgeSizePreset(name) {
-            applySizePreset(name);
+            applySizePreset(name)
             try {
-                localStorage.setItem('badgeSizePreset', name);
+                localStorage.setItem('badgeSizePreset', name)
             } catch (_) {}
         }
 
         function initBadgeSizePreset() {
-            let preset = 'credit';
+            let preset = 'credit'
             try {
-                const saved = localStorage.getItem('badgeSizePreset');
-                if (saved && SIZE_PRESETS[saved]) preset = saved;
+                const saved = localStorage.getItem('badgeSizePreset')
+                if (saved && SIZE_PRESETS[saved]) preset = saved
             } catch (_) {}
-            applySizePreset(preset);
-            const sel = document.getElementById('badge-size-preset');
-            if (sel) sel.value = preset;
-        }
-
-        function setPrintCompensation(value) {
-            const n = Number(value);
-            if (!Number.isFinite(n) || n <= 0) return;
-            const clamped = Math.min(Math.max(n, 1.0), 1.6);
-            document.documentElement.style.setProperty('--print-compensation', String(clamped));
-            try {
-                localStorage.setItem('badgePrintCompensation', String(clamped));
-            } catch (_) {}
-        }
-
-        function initPrintCompensation() {
-            let comp = '1.43';
-            try {
-                const saved = localStorage.getItem('badgePrintCompensation');
-                if (saved) comp = saved;
-            } catch (_) {}
-            setPrintCompensation(comp);
-            const sel = document.getElementById('print-compensation-select');
-            if (!sel) return;
-            const exists = Array.from(sel.options).some(o => o.value === comp);
-            if (!exists) {
-                const opt = document.createElement('option');
-                opt.value = comp;
-                opt.textContent = `${Number(comp).toFixed(2)}x`;
-                sel.appendChild(opt);
-            }
-            sel.value = comp;
+            applySizePreset(preset)
+            const sel = document.getElementById('badge-size-preset')
+            if (sel) sel.value = preset
         }
 
         async function generateBadge(record) {
-            const photoURL = await getPhotoURL(record.Photo);
-            const issueDate = record.Contract_Date || record.Training_Date || null;
-            const expiryDate = record.Contract_Expiration || record.Contract_End || null;
+            const photoURL = await getPhotoURL(record.Photo)
+            const issueDate = record.Contract_Date || record.Training_Date || null
+            const expiryDate = record.Contract_Expiration || record.Contract_End || null
             return `
                 <div class="badge-container">
                     <div class="content id absolute">${record.Employee_ID || ''}</div>
@@ -353,127 +307,121 @@
                     </div>
                     <img class="background" src="https://cdn.soloist.ai/3574a624-2397-40a5-983a-c2030d8ba2b7/a919ac76-f7a5-4a9c-8c07-93b39c252509_2048x2048.webp" alt="Badge Background" />
                 </div>
-            `;
+            `
         }
 
         function extractAttachmentId(value) {
-            if (value == null) return null;
-            if (typeof value === 'number') return value;
+            if (value == null) return null
+            if (typeof value === 'number') return value
             if (typeof value === 'string') {
-                const n = Number(value);
-                return Number.isFinite(n) ? n : null;
+                const n = Number(value)
+                return Number.isFinite(n) ? n : null
             }
             if (Array.isArray(value)) {
                 for (const v of value) {
-                    const id = extractAttachmentId(v);
-                    if (id != null) return id;
+                    const id = extractAttachmentId(v)
+                    if (id != null) return id
                 }
             }
-            if (typeof value === 'object' && typeof value.id === 'number') return value.id;
-            return null;
+            if (typeof value === 'object' && typeof value.id === 'number') return value.id
+            return null
         }
 
         async function ensureToken() {
             if (!tokenInfo || tokenInfo.expiresAt < Date.now() + 60000) {
-                tokenInfo = await grist.docApi.getAccessToken({ readOnly: true });
-                tokenInfo.expiresAt = Date.now() + (tokenInfo.ttlMsecs ?? 3600000);
+                tokenInfo = await grist.docApi.getAccessToken({ readOnly: true })
+                tokenInfo.expiresAt = Date.now() + (tokenInfo.ttlMsecs ?? 3600000)
             }
-            return tokenInfo;
+            return tokenInfo
         }
 
         async function getPhotoURL(attachmentValue) {
             try {
-                const attachmentId = extractAttachmentId(attachmentValue);
-                if (!attachmentId) return '';
-                const t = await ensureToken();
-                return `${t.baseUrl}/attachments/${attachmentId}/download?auth=${t.token}`;
+                const attachmentId = extractAttachmentId(attachmentValue)
+                if (!attachmentId) return ''
+                const t = await ensureToken()
+                return `${t.baseUrl}/attachments/${attachmentId}/download?auth=${t.token}`
             } catch (error) {
-                console.error('Error getting photo URL:', error);
-                return '';
+                console.error('Error getting photo URL:', error)
+                return ''
             }
         }
 
         function parseDate(value) {
-            if (!value || value === 'None') return null;
-            if (value instanceof Date) return isNaN(value) ? null : value;
+            if (!value || value === 'None') return null
+            if (value instanceof Date) return isNaN(value) ? null : value
 
             if (typeof value === 'number') {
-                // Grist can provide ms timestamps, seconds timestamps, or serial day values.
-                let d;
+                let d
                 if (value > 1e12) {
-                    d = new Date(value); // milliseconds
+                    d = new Date(value)
                 } else if (value > 1e9) {
-                    d = new Date(value * 1000); // seconds
+                    d = new Date(value * 1000)
                 } else {
-                    d = new Date(Date.UTC(1970, 0, 1) + (value * 86400000)); // days since epoch
+                    d = new Date(Date.UTC(1970, 0, 1) + (value * 86400000))
                 }
-                return isNaN(d) ? null : d;
+                return isNaN(d) ? null : d
             }
 
             if (typeof value === 'string') {
-                const s = value.trim();
-                if (!s) return null;
+                const s = value.trim()
+                if (!s) return null
 
-                const iso = new Date(s);
-                if (!isNaN(iso)) return iso;
+                const iso = new Date(s)
+                if (!isNaN(iso)) return iso
 
-                const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
                 if (m) {
-                    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
-                    return isNaN(d) ? null : d;
+                    const d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]))
+                    return isNaN(d) ? null : d
                 }
             }
 
-            return null;
+            return null
         }
 
         function formatDate(value) {
-            const date = parseDate(value);
-            if (!date) return '';
+            const date = parseDate(value)
+            if (!date) return ''
             return [
                 String(date.getDate()).padStart(2, '0'),
                 String(date.getMonth() + 1).padStart(2, '0'),
                 date.getFullYear()
-            ].join('/');
+            ].join('/')
         }
 
         function generateBadges(records) {
-            const badgesContainer = document.getElementById('badges-container');
-            badgesContainer.innerHTML = '';
+            const badgesContainer = document.getElementById('badges-container')
+            badgesContainer.innerHTML = ''
 
-            if (records.length === 0) return;
+            if (records.length === 0) return
 
-            // Generate all badges in a single container
             Promise.all(records.map(record => generateBadge(record)))
                 .then(badges => {
-                    badgesContainer.innerHTML = badges.join('');
-                });
+                    badgesContainer.innerHTML = badges.join('')
+                })
         }
 
-
-
-        // Initialize badge physical-size preset and printer compensation
-        initBadgeSizePreset();
-        initPrintCompensation();
+        // Initialize badge physical-size preset
+        initBadgeSizePreset()
 
         // Grist integration
-        grist.ready();
+        grist.ready()
 
         // Warm token cache for photo URLs
-        ensureToken().catch(() => {});
+        ensureToken().catch(() => {})
 
         // Handle records from Grist
         grist.onRecord(function(record) {
-            // For single record display, create array with just this record
-            allRecords = [record];
-            generateBadges(allRecords);
-        });
+            allRecords = [record]
+            generateBadges(allRecords)
+        })
 
         // Handle table data for multiple records
         grist.onRecords(function(records) {
-            allRecords = records || [];
-            generateBadges(allRecords);
-        });
+            allRecords = records || []
+            generateBadges(allRecords)
+        })
 
         // Handle ready event
         grist.ready({
@@ -490,7 +438,7 @@
                 'Training_Date',
                 'Photo'
             ]
-        });
+        })
     </script>
 </body>
 </html>
