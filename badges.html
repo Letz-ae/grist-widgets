@@ -9,6 +9,7 @@
     <style>
         :root {
                     --badge-scale: 1;
+                    --badge-print-scale: 1.18;
                 }
 
         * {
@@ -121,6 +122,10 @@
             @page {
                 size: A4;
                 margin: 10mm;
+            }
+
+            :root {
+                --badge-scale: var(--badge-print-scale);
             }
 
             body {
