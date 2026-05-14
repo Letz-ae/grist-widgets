@@ -302,7 +302,7 @@
                 record.Contract_Start ||
                 record.Contract_Start_Date ||
                 null
-            const expiryDate = getBadgeExpiry(record)
+            const expiryDate = record.Contract_Expiration || record.Contract_End || record.End_Contract || null
             return `
                 <div class="badge-container">
                     <div class="content id absolute">${record.Employee_ID || ''}</div>
@@ -406,25 +406,7 @@
             ].join('/')
         }
 
-        function getBadgeExpiry(record) {
-            const emiratesExpiry = parseDate(
-                record.Emirates_ID_Validity ||
-                record.Emirates_ID_Expiry_Check ||
-                record.Emirates_ID_Expiration
-            )
 
-            const contractEnd = parseDate(
-                record.End_Contract ||
-                record.Contract_End ||
-                record.Contract_Expiration
-            )
-
-            if (emiratesExpiry && contractEnd) {
-                return emiratesExpiry <= contractEnd ? emiratesExpiry : contractEnd
-            }
-
-            return emiratesExpiry || contractEnd || null
-        }
 
         function generateBadges(records) {
             const badgesContainer = document.getElementById('badges-container')
@@ -473,8 +455,6 @@
                 'Contract_Expiration',
                 'Contract_End',
                 'End_Contract',
-                'Emirates_ID_Validity',
-                'Emirates_ID_Expiry_Check',
                 'Training_Date',
                 'Photo'
             ]
