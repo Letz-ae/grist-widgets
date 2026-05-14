@@ -291,7 +291,7 @@
 
         async function generateBadge(record) {
             const photoURL = await getPhotoURL(record.Photo)
-            const issueDate = record.Contract_Date || record.Training_Date || null
+            const issueDate = record.Contract_Date || null
             const expiryDate = getBadgeExpiry(record)
             return `
                 <div class="badge-container">
